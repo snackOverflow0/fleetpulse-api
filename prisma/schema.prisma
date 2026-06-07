@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// USER MODEL (The Fleet Workers / Admins)
+// ==========================================
+model User {
+  id           String   @id @default(uuid()) // Unique identification using UUID format
+  email        String   @unique              // No two accounts can share the same email
+  password     String                        // Hashed password string (Bcrypt)
+  refreshToken String?  @map("refresh_token") // Optional field. Used for token rotation management.
+  role         String   @default("OPERATOR")  // Roles: "ADMIN", "HUB_MANAGER", "DRIVER", "OPERATOR"
+  createdAt    DateTime @default(now())       @map("created_at")
+  updatedAt    DateTime @updatedAt            @map("updated_at")
+
+  // Virtual Relations (Hindi ito gumagawa ng column sa totoong database)
+  // These are for Prisma orchestration to traverse tables smoothly.
+  managedHubs Hub[]      @relation("HubManager")
+  drivenVehicles Vehicle[] @relation("VehicleDriver")
+
+  @@map("users") // Renames the database table to lowercase plural "users"
+}
+
+// ==========================================
+// COMPANY / TENANT MODEL (The Master Boundary)
+// ==========================================
+model Company {
+  id        String   @id @default(uuid())
+  name      String   // Name of the logistics company (e.g., "Lalamove Manila")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // 🔄 Hierarchical Child Relations
+  // Isang kumpanya, maraming distribution warehouses/hubs (1:N Relation)
+  hubs      Hub[]
+
+  @@map("companies")
+}
+
+// ==========================================
+// 📦 HUB MODEL (Logistics Distribution Warehouses)
+// ==========================================
+model Hub {
+  id        String   @id @default(uuid())
+  name      String   // Name of the specific facility (e.g., "Quezon City Central Hub")
+  companyId String   @map("company_id")   // Links this Hub to its parent Company
+  managerId String?  @map("manager_id")   // Optional link to a User who manages this specific hub
+  createdAt DateTime @default(now())       @map("created_at")
+
+  // 🔄 Relation Definitions & Cascading Rules
+  // Tagalog: Pag binura ang Company, awtomatikong mabubura ang lahat ng Hubs sa ilalim nito (Cascade).
+  // English: If the parent Company is deleted, automatically cascade delete all nested Hubs.
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // Tagalog: Pag binura ang Manager account, HINDI mabubura ang bodega. Magiging NULL lang ang managerId.
+  // English: If the User managing this hub is deleted, keep the hub intact but set managerId to Null.
+  manager   User?    @relation("HubManager", fields: [managerId], references: [id], onDelete: SetNull)
+  
+  // 🔄 Sub-Relations
+  vehicles  Vehicle[]
+  shipments Shipment[]
+
+  @@map("hubs")
+}
+
+// ==========================================
+// 🚛 VEHICLE MODEL (Delivery Fleet Vehicles)
+// ==========================================
+model Vehicle {
+  id        String   @id @default(uuid())
+  plateNo   String   @unique @map("plate_no") // Unique tracking plate identification number
+  type      String   // Type classifications: "TRUCK", "VAN", "MOTORCYCLE"
+  status    String   @default("IDLE")         // Operational states: "IDLE", "EN_ROUTE", "MAINTENANCE"
+  hubId     String   @map("hub_id")           // The warehouse facility base where this vehicle belongs
+  driverId  String?  @map("driver_id")        // The user assigned to drive this vehicle
+  createdAt DateTime @default(now())          @map("created_at")
+
+  // 🔄 Relation Layouts
+  hub       Hub      @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  driver    User?    @relation("VehicleDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  
+  // A vehicle can carry multiple shipment packages at the same time
+  shipments Shipment[]
+
+  @@map("vehicles")
+}
+
+// ==========================================
+// 🏷️ SHIPMENT MODEL (The Delivery Packages)
+// ==========================================
+model Shipment {
+  id          String   @id @default(uuid())
+  trackingNo  String   @unique @map("tracking_no") // Unique tracking string printed on package barcodes
+  recipient   String   // Name of the package receiver
+  status      String   @default("MANIFESTED")       // Lifecycle states: "MANIFESTED", "IN_TRANSIT", "DELIVERED", "FAILED"
+  hubId       String   @map("hub_id")               // Current or starting hub position
+  vehicleId   String?  @map("vehicle_id")           // Current assigned transport vehicle container
+  createdAt   DateTime @default(now())              @map("created_at")
+  updatedAt   DateTime @updatedAt                   @map("updated_at")
+
+  // 🔄 Cross-Tenant Security Traversal Points
+  hub         Hub      @relation(fields: [hubId], references: [id], onDelete: Cascade)
+  vehicle     Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@map("shipments")
+}
