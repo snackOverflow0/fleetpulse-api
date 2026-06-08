@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 import { RedisService } from "src/redis/redis.service";
+import { EmailService } from "src/email/email.service";
 
 export interface FleetLogPayload {
   action: 'SHIPMENT_CREATED' | 'SHIPMENT_DELIVERED' | 'VEHICLE_EN_ROUTE'
@@ -10,7 +11,10 @@ export interface FleetLogPayload {
 
 @Injectable()
 export class ActivityListener {
-  constructor(private redis: RedisService) {}
+  constructor(
+    private redis: RedisService,
+    private emailService: EmailService
+  ) {}
 
   @OnEvent('fleet.action', { async: true })
   async handleFleetActivityLog(payload: FleetLogPayload) {
@@ -22,9 +26,15 @@ export class ActivityListener {
         await this.redis.zincrby(leaderboardKey, 1, payload.userId)
 
         console.log(`\x1b[35m[REDIS SYNC COMPLETE]\x1b[0m Metrics pushed to cache engine for driver ${payload.userId}`)
+
+        await this.emailService.sendDeliverReceipt(
+          'customer.test@example.com',
+          'FP-DELIVERY-77712',
+          'Juan Dela Cruz'
+        )
       }
     } catch (error) {
-      console.error(`[REDIS PIPELINE CRITICAL ERROR]:`, error.message)
+      console.error(`[CRITICAL INTERNAL BACKGROUND RUNTIME FAILURE]:`, error.message)
     }
   }
 }
