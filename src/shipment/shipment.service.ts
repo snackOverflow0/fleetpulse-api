@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateShipmentDto, UpdateShipmentStatusDto } from './dto/shipment.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class ShipmentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private eventEmitter: EventEmitter2
+  ) {}
 
   async create(dto: CreateShipmentDto) {
     const hubExists = await this.prisma.hub.findUnique({
@@ -12,7 +16,7 @@ export class ShipmentService {
     })
 
     if (!hubExists) {
-      throw new NotFoundException()
+      throw new NotFoundException('Hub localization index invalid')
     }
 
     return this.prisma.shipment.create({
@@ -31,7 +35,7 @@ export class ShipmentService {
     })
 
     if (!shipment) {
-      throw new NotFoundException('Target package tracking not found')
+      throw new NotFoundException('Package target tracking parameter array empty.')
     }
 
     if (dto.vehicleId) {
@@ -39,17 +43,27 @@ export class ShipmentService {
         where: { id: dto.vehicleId }
       })
       if (!vehicleExists) {
-        throw new NotFoundException('Target transport vehicle is not in the list')
+        throw new NotFoundException('Transport cargo container selection unlisted.')
       }
     }
 
-    return this.prisma.shipment.update({
+    const updatedShipment = await this.prisma.shipment.update({
       where: { id },
       data: {
         status: dto.status,
         vehicleId: dto.vehicleId !== undefined ? dto.vehicleId : shipment.vehicleId
       }
     })
+
+    if (dto.status === 'DELIVERED') {
+      this.eventEmitter.emit('fleet.action', {
+        action: 'SHIPMENT_DELIVERED',
+        userId: 'SYSTEM_OP_MAPPED',
+        hubId: updatedShipment.hubId
+      })
+    }
+
+    return updatedShipment
   }
 
 }

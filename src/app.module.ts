@@ -7,9 +7,19 @@ import { CompanyModule } from './company/company.module';
 import { HubModule } from './hub/hub.module';
 import { VehicleModule } from './vehicle/vehicle.module';
 import { ShipmentModule } from './shipment/shipment.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ActivityModule } from './activity/activity.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, CompanyModule, HubModule, VehicleModule, ShipmentModule],
+  imports: [
+    EventEmitterModule.forRoot(),
+    PrismaModule, 
+    AuthModule, 
+    CompanyModule, 
+    HubModule, 
+    VehicleModule, 
+    ShipmentModule, ActivityModule
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
