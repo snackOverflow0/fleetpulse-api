@@ -9,6 +9,7 @@ import { VehicleModule } from './vehicle/vehicle.module';
 import { ShipmentModule } from './shipment/shipment.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ActivityModule } from './activity/activity.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { ActivityModule } from './activity/activity.module';
     CompanyModule, 
     HubModule, 
     VehicleModule, 
-    ShipmentModule, ActivityModule
+    ShipmentModule, ActivityModule, RedisModule
   ],
   controllers: [AppController],
   providers: [AppService],
