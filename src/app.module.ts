@@ -19,7 +19,9 @@ import { RedisModule } from './redis/redis.module';
     CompanyModule, 
     HubModule, 
     VehicleModule, 
-    ShipmentModule, ActivityModule, RedisModule
+    ShipmentModule, 
+    ActivityModule, 
+    RedisModule
   ],
   controllers: [AppController],
   providers: [AppService],
